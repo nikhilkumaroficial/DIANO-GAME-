@@ -9,7 +9,7 @@
 body {
   margin: 0;
   overflow: hidden;
-  background: linear-gradient(#87ceeb, #f0faff);
+  background: #fff;
   font-family: Arial, sans-serif;
 }
 canvas { display: block; }
@@ -27,7 +27,6 @@ canvas { display: block; }
   right: 15px;
   font-weight: bold;
   cursor: pointer;
-  user-select: none;
 }
 .center {
   position: fixed;
@@ -54,79 +53,37 @@ canvas { display: block; }
 <div class="center hidden" id="over">GAME OVER<br>PRESS R / TAP TO RESTART</div>
 
 <script>
-/* ================= AUDIO ================= */
+/* ===== AUDIO ===== */
+const bgMusic = new Audio("bg music.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+
+const startSound = new Audio("start.mp3");
+startSound.volume = 0.6;
+
+const outSound = new Audio("out.mp3");
+outSound.volume = 0.6;
+
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioCtx();
 let muted = false;
-let bgOsc = null;
 
 function unlockAudio() {
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
-function playJumpSound() {
-  if (muted) return;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type = "square";
-  o.frequency.value = 600;
-  g.gain.value = 0.15;
-  o.connect(g).connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + 0.08);
-}
-
-function startBgSound() {
-  if (bgOsc || muted) return;
-  bgOsc = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  bgOsc.type = "sine";
-  bgOsc.frequency.value = 90;
-  g.gain.value = 0.03;
-  bgOsc.connect(g).connect(audioCtx.destination);
-  bgOsc.start();
-}
-
-function stopBgSound() {
-  if (bgOsc) {
-    bgOsc.stop();
-    bgOsc = null;
-  }
-}
-
-function playGameOverSound() {
-  if (muted) return;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type = "triangle";
-  o.frequency.setValueAtTime(400, audioCtx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.5);
-  g.gain.value = 0.25;
-  o.connect(g).connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + 0.5);
-}
-
-/* ================= MUTE ================= */
-const muteBtn = document.getElementById("mute");
-muteBtn.onclick = () => {
-  muted = !muted;
-  muteBtn.textContent = muted ? "🔇" : "🔊";
-  if (muted) stopBgSound();
-  else if (state === "RUNNING") startBgSound();
-};
-
-/* ================= GAME ================= */
+/* ===== CANVAS ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 
+/* ===== GAME STATE ===== */
 let state = "START";
 let score = 0;
 let speed = 7;
@@ -140,12 +97,28 @@ const dino = { x: 80, y: 0, w: 40, h: 50, vy: 0, jumping: false, duck: false };
 const ground = () => canvas.height * 0.75;
 let obstacles = [];
 
-/* ===== DAY / NIGHT (SLOWER SWITCH) ===== */
+/* ===== DAY / NIGHT ===== */
 function isNight() {
   return Math.floor(score / 2500) % 2 === 1;
 }
 
-/* ================= OBSTACLES ================= */
+/* ===== STARS ===== */
+const stars = Array.from({ length: 80 }, () => ({
+  x: Math.random() * innerWidth,
+  y: Math.random() * innerHeight * 0.5,
+  r: Math.random() * 1.5 + 0.5
+}));
+
+/* ===== MUTE ===== */
+const muteBtn = document.getElementById("mute");
+muteBtn.onclick = () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? "🔇" : "🔊";
+  if (muted) bgMusic.pause();
+  else if (state === "RUNNING") bgMusic.play();
+};
+
+/* ===== OBSTACLES ===== */
 function spawnObstacle() {
   const isBird = Math.random() < 0.3;
   let o = { x: canvas.width + 20, y: 0, w: 0, h: 0, type: isBird ? "bird" : "cactus" };
@@ -153,7 +126,7 @@ function spawnObstacle() {
   if (isBird) {
     o.w = 55;
     o.h = 90;
-    o.y = ground() - 25 - o.h - 6;
+    o.y = ground() - 25 - o.h;
   } else {
     o.w = Math.random() < 0.5 ? 25 : 40;
     o.h = Math.random() < 0.5 ? 40 : 60;
@@ -166,33 +139,30 @@ function jump() {
   if (!dino.jumping) {
     dino.vy = -16;
     dino.jumping = true;
-    playJumpSound();
   }
 }
 
-/* ================= CONTROLS ================= */
-document.addEventListener("keydown", e => {
+/* ===== CONTROLS ===== */
+addEventListener("keydown", e => {
   unlockAudio();
-
   if (e.code === "Space") {
     if (state === "START") start();
-    if (state === "RUNNING") jump();
+    else if (state === "RUNNING") jump();
   }
   if (e.code === "ArrowDown") dino.duck = true;
   if (e.code === "KeyR" && state === "OVER") start();
 });
 
-document.addEventListener("keyup", e => {
+addEventListener("keyup", e => {
   if (e.code === "ArrowDown") dino.duck = false;
 });
 
 canvas.addEventListener("touchstart", () => {
   unlockAudio();
-  if (state === "START" || state === "OVER") start();
-  else jump();
+  state === "RUNNING" ? jump() : start();
 });
 
-/* ================= FLOW ================= */
+/* ===== FLOW ===== */
 function start() {
   state = "RUNNING";
   score = 0;
@@ -203,35 +173,42 @@ function start() {
   dino.vy = 0;
   dino.jumping = false;
   dino.duck = false;
-  startBgSound();
+
+  startSound.currentTime = 0;
+  startSound.play();
+
+  if (!muted) {
+    bgMusic.currentTime = 0;
+    bgMusic.play();
+  }
+
   document.getElementById("start").classList.add("hidden");
   document.getElementById("over").classList.add("hidden");
 }
 
 function gameOver() {
   state = "OVER";
-  stopBgSound();
-  playGameOverSound();
+  bgMusic.pause();
+  bgMusic.currentTime = 0;
+
+  outSound.currentTime = 0;
+  outSound.play();
 
   if (score > highScore) {
     highScore = score;
     localStorage.setItem("dinoHigh", highScore);
     document.getElementById("high").innerText = "HIGH: " + highScore;
   }
-
   document.getElementById("over").classList.remove("hidden");
 }
 
 function hit(a, b) {
   const ah = a.duck ? a.h / 2 : a.h;
   const ay = a.y + (a.h - ah);
-  return a.x < b.x + b.w &&
-         a.x + a.w > b.x &&
-         ay < b.y + b.h &&
-         ay + ah > b.y;
+  return a.x < b.x + b.w && a.x + a.w > b.x && ay < b.y + b.h && ay + ah > b.y;
 }
 
-/* ================= UPDATE ================= */
+/* ===== UPDATE ===== */
 function update() {
   if (state !== "RUNNING") return;
 
@@ -252,61 +229,73 @@ function update() {
 
   obstacles.forEach(o => o.x -= speed);
   obstacles = obstacles.filter(o => o.x + o.w > 0);
-
-  obstacles.forEach(o => {
-    if (hit(dino, o)) gameOver();
-  });
+  obstacles.forEach(o => hit(dino, o) && gameOver());
 
   document.getElementById("score").innerText = "SCORE: " + score;
 }
 
-/* ================= DRAW ================= */
+/* ===== DRAW ===== */
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  const t = (score % 2500) / 2500;
+
+  /* SKY */
   if (isNight()) {
     ctx.fillStyle = "#0B132B";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#F1F1F1";
-    ctx.beginPath();
-    ctx.arc(canvas.width - 90, 90, 30, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "#fff";
+    stars.forEach(s => {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
   } else {
     const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    sky.addColorStop(0, "#87CEEB");
+    sky.addColorStop(0, t > 0.6 ? "#FF8C42" : "#87CEEB");
     sky.addColorStop(1, "#FFFFFF");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#FFD93D";
-    ctx.beginPath();
-    ctx.arc(canvas.width - 90, 90, 35, 0, Math.PI * 2);
-    ctx.fill();
   }
 
+  /* GROUND */
   ctx.fillStyle = "#E3C16F";
   ctx.fillRect(0, ground(), canvas.width, canvas.height);
 
-  ctx.strokeStyle = "#2ECC71";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(0, ground());
-  ctx.lineTo(canvas.width, ground());
-  ctx.stroke();
+  /* ===== TEXT ON GROUND (CENTER) ===== */
+  ctx.font = "bold 36px Arial";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#6B4F1D";
+  ctx.globalAlpha = 0.35;
+  ctx.fillText(
+    "MADE BY NIKHIL",
+    canvas.width / 2,
+    ground() + 50
+  );
+  ctx.globalAlpha = 1;
 
+  /* DINO */
   ctx.fillStyle = "#27AE60";
   const dh = dino.duck ? dino.h / 2 : dino.h;
   ctx.fillRect(dino.x, dino.y + (dino.h - dh), dino.w, dh);
 
+  /* DINO EYE */
   ctx.fillStyle = "#000";
-  ctx.fillRect(dino.x + 25, dino.y + 10, 5, 5);
+  ctx.fillRect(
+    dino.x + 28,
+    dino.y + (dino.h - dh) + 10,
+    5,
+    5
+  );
 
+  /* OBSTACLES */
   obstacles.forEach(o => {
     ctx.fillStyle = o.type === "bird" ? "#E74C3C" : "#1E8449";
     ctx.fillRect(o.x, o.y, o.w, o.h);
   });
 }
 
-/* ================= LOOP ================= */
+/* ===== LOOP ===== */
 function loop() {
   requestAnimationFrame(loop);
   update();
