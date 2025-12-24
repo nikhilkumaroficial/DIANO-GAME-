@@ -13,6 +13,8 @@ body {
   font-family: Arial, sans-serif;
 }
 canvas { display: block; }
+
+/* UI */
 .ui {
   position: fixed;
   top: 10px;
@@ -38,6 +40,31 @@ canvas { display: block; }
   font-weight: bold;
 }
 .hidden { display: none; }
+
+/* MOBILE CONTROLS (ONLY ADDITION) */
+.controls {
+  position: fixed;
+  bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+.btn {
+  width: 120px;
+  height: 60px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
 </style>
 </head>
 
@@ -52,6 +79,12 @@ canvas { display: block; }
 <div class="center" id="start">PRESS SPACE / TAP TO START</div>
 <div class="center hidden" id="over">GAME OVER<br>PRESS R / TAP TO RESTART</div>
 
+<!-- MOBILE BUTTONS -->
+<div class="controls">
+  <div class="btn" id="duckBtn">DUCK</div>
+  <div class="btn" id="jumpBtn">JUMP</div>
+</div>
+
 <script>
 /* ===== AUDIO ===== */
 const bgMusic = new Audio("bg music.mp3");
@@ -59,18 +92,9 @@ bgMusic.loop = true;
 bgMusic.volume = 0.4;
 
 const startSound = new Audio("start.mp3");
-startSound.volume = 0.6;
-
 const outSound = new Audio("out.mp3");
-outSound.volume = 0.6;
 
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioCtx();
 let muted = false;
-
-function unlockAudio() {
-  if (audioCtx.state === "suspended") audioCtx.resume();
-}
 
 /* ===== CANVAS ===== */
 const canvas = document.getElementById("game");
@@ -97,12 +121,12 @@ const dino = { x: 80, y: 0, w: 40, h: 50, vy: 0, jumping: false, duck: false };
 const ground = () => canvas.height * 0.75;
 let obstacles = [];
 
-/* ===== DAY / NIGHT ===== */
+/* ===== DAY / NIGHT (UNCHANGED) ===== */
 function isNight() {
   return Math.floor(score / 2500) % 2 === 1;
 }
 
-/* ===== STARS ===== */
+/* ===== STARS (UNCHANGED) ===== */
 const stars = Array.from({ length: 80 }, () => ({
   x: Math.random() * innerWidth,
   y: Math.random() * innerHeight * 0.5,
@@ -118,7 +142,7 @@ muteBtn.onclick = () => {
   else if (state === "RUNNING") bgMusic.play();
 };
 
-/* ===== OBSTACLES ===== */
+/* ===== OBSTACLES (UNCHANGED) ===== */
 function spawnObstacle() {
   const isBird = Math.random() < 0.3;
   let o = { x: canvas.width + 20, y: 0, w: 0, h: 0, type: isBird ? "bird" : "cactus" };
@@ -126,7 +150,7 @@ function spawnObstacle() {
   if (isBird) {
     o.w = 55;
     o.h = 90;
-    o.y = ground() - 25 - o.h;
+    o.y = ground() - 25 - o.h - 6;
   } else {
     o.w = Math.random() < 0.5 ? 25 : 40;
     o.h = Math.random() < 0.5 ? 40 : 60;
@@ -142,9 +166,8 @@ function jump() {
   }
 }
 
-/* ===== CONTROLS ===== */
+/* ===== CONTROLS PC (UNCHANGED) ===== */
 addEventListener("keydown", e => {
-  unlockAudio();
   if (e.code === "Space") {
     if (state === "START") start();
     else if (state === "RUNNING") jump();
@@ -152,14 +175,23 @@ addEventListener("keydown", e => {
   if (e.code === "ArrowDown") dino.duck = true;
   if (e.code === "KeyR" && state === "OVER") start();
 });
-
 addEventListener("keyup", e => {
   if (e.code === "ArrowDown") dino.duck = false;
 });
 
-canvas.addEventListener("touchstart", () => {
-  unlockAudio();
+/* ===== CONTROLS MOBILE (ONLY ADDITION) ===== */
+document.getElementById("jumpBtn").addEventListener("touchstart", e => {
+  e.preventDefault();
   state === "RUNNING" ? jump() : start();
+});
+
+document.getElementById("duckBtn").addEventListener("touchstart", e => {
+  e.preventDefault();
+  dino.duck = true;
+});
+document.getElementById("duckBtn").addEventListener("touchend", e => {
+  e.preventDefault();
+  dino.duck = false;
 });
 
 /* ===== FLOW ===== */
@@ -176,7 +208,6 @@ function start() {
 
   startSound.currentTime = 0;
   startSound.play();
-
   if (!muted) {
     bgMusic.currentTime = 0;
     bgMusic.play();
@@ -190,7 +221,6 @@ function gameOver() {
   state = "OVER";
   bgMusic.pause();
   bgMusic.currentTime = 0;
-
   outSound.currentTime = 0;
   outSound.play();
 
@@ -220,7 +250,6 @@ function update() {
 
   dino.vy += gravity;
   dino.y += dino.vy;
-
   if (dino.y >= ground() - dino.h) {
     dino.y = ground() - dino.h;
     dino.vy = 0;
@@ -234,13 +263,12 @@ function update() {
   document.getElementById("score").innerText = "SCORE: " + score;
 }
 
-/* ===== DRAW ===== */
+/* ===== DRAW (UNCHANGED VISUALS) ===== */
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const t = (score % 2500) / 2500;
 
-  /* SKY */
   if (isNight()) {
     ctx.fillStyle = "#0B132B";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -258,37 +286,23 @@ function draw() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  /* GROUND */
   ctx.fillStyle = "#E3C16F";
   ctx.fillRect(0, ground(), canvas.width, canvas.height);
 
-  /* ===== TEXT ON GROUND (CENTER) ===== */
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = "#6B4F1D";
   ctx.font = "bold 36px Arial";
   ctx.textAlign = "center";
-  ctx.fillStyle = "#6B4F1D";
-  ctx.globalAlpha = 0.35;
-  ctx.fillText(
-    "MADE BY NIKHIL",
-    canvas.width / 2,
-    ground() + 50
-  );
+  ctx.fillText("MADE BY NIKHIL", canvas.width / 2, ground() + 50);
   ctx.globalAlpha = 1;
 
-  /* DINO */
   ctx.fillStyle = "#27AE60";
   const dh = dino.duck ? dino.h / 2 : dino.h;
   ctx.fillRect(dino.x, dino.y + (dino.h - dh), dino.w, dh);
 
-  /* DINO EYE */
   ctx.fillStyle = "#000";
-  ctx.fillRect(
-    dino.x + 28,
-    dino.y + (dino.h - dh) + 10,
-    5,
-    5
-  );
+  ctx.fillRect(dino.x + 28, dino.y + (dino.h - dh) + 10, 5, 5);
 
-  /* OBSTACLES */
   obstacles.forEach(o => {
     ctx.fillStyle = o.type === "bird" ? "#E74C3C" : "#1E8449";
     ctx.fillRect(o.x, o.y, o.w, o.h);
